@@ -1,4 +1,5 @@
-﻿using System;
+﻿using NavMeshLib.Enums;
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Text;
@@ -10,19 +11,46 @@ using UnityEngine.UIElements;
 
 namespace NavMeshLib.Editor
 {
+    /// <summary>
+    /// A helper mono behavior that allows moon makers to rebake the current scene's NavMesh.
+    /// </summary>
     public class NavMeshUpdater : MonoBehaviour
     {
-        [Tooltip("NavMesh surfaces to update. Leave empty to update all active NavMesh surfaces.")]
+        [Tooltip("What surfaces should be rebuild when UpdateNavMesh is called?")]
+        public RebuildType rebuildType = RebuildType.AllSurfaces;
+
+        [Tooltip("NavMesh surfaces to update when using SelectedSurfaces.")]
         public NavMeshSurface[]? surfacesToUpdate;
 
+        /// <summary>
+        /// Updates the current scene's NavMesh based on <see cref="rebuildType"/>
+        /// </summary>
         public void UpdateNavMesh()
         {
             // Did the moon creator specify surfaces for us to rebake
-            NavMeshSurface[]? updateNavMesh = surfacesToUpdate;
-            if (updateNavMesh == null || updateNavMesh.Length == 0)
+            NavMeshSurface[] updateNavMesh;
+            switch (rebuildType)
             {
-                // Just grab every active surface
-                updateNavMesh = NavMeshSurface.s_NavMeshSurfaces.ToArray();
+                case RebuildType.OutsideSurfaces:
+                    NavMeshUtil.RebakeExteriorNavMesh();
+                    return;
+                case RebuildType.InsideSurfaces:
+                    NavMeshUtil.RebakeDunGenNavMesh();
+                    return;
+                case RebuildType.Custom:
+                    updateNavMesh = surfacesToUpdate ?? Array.Empty<NavMeshSurface>();
+                    if (updateNavMesh.Length == 0)
+                    {
+                        Plugin.LogWarning($"NavMeshUpdater on '{gameObject.name}' is configured for Custom but has no NavMesh surfaces assigned.");
+                        return;
+                    }
+                    break;
+                case RebuildType.ActiveSurfaces:
+                case RebuildType.AllSurfaces:
+                default:
+                    var includeInactive = rebuildType == RebuildType.ActiveSurfaces ? FindObjectsInactive.Exclude : FindObjectsInactive.Include;
+                    updateNavMesh = UnityEngine.Object.FindObjectsByType<NavMeshSurface>(includeInactive, FindObjectsSortMode.None);
+                    break;
             }
 
             // Go and prep all surfaces to rebake

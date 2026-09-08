@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Text;
 using Unity.AI.Navigation;
@@ -376,13 +377,84 @@ namespace NavMeshLib
         /// <summary>
         /// A helper function that rebakes the entire exterior NavMesh
         /// </summary>
-        public static void RebakeExteriorNavMesh()
+        /// <param name="environmentObject">When rebaking the exterior NavMesh, you can pass in a custom object. If null, we attempt to find OutsideLevelNavMesh ourself.</param>
+        /// <param name="generateNewSurfaces">Should we create new <see cref="NavMeshSurface"/>s if they don't exist for custom agent types</param>
+        public static void RebakeExteriorNavMesh(GameObject? environmentObject = null, bool generateNewSurfaces = false)
         {
-            GameObject enviromentObject = GameObject.FindGameObjectWithTag("OutsideLevelNavMesh");
-            if (enviromentObject != null)
+            // Did the user give us the enviorment object
+            if (environmentObject == null)
             {
-                NavMeshSurface[] surfacesToUpdate = enviromentObject.GetComponents<NavMeshSurface>();
+                environmentObject = GameObject.FindGameObjectWithTag("OutsideLevelNavMesh");
+            }
+
+            // Lets go and regen the outside NavMesh
+            if (environmentObject != null)
+            {
+                // Should we add missing surfaces
+                HashSet<NavMeshSurface> navMeshSurfaces = new HashSet<NavMeshSurface>();
+                if (generateNewSurfaces)
+                {
+                    // This exists to allow us to add custom NavMeshSurfaces for all custom agent
+                    // types that were registered earlier
+                    NavMeshSurface existingSurface = environmentObject.GetComponent<NavMeshSurface>();
+                    int settingsCount = NavMesh.GetSettingsCount();
+                    for (int i = 0; i < settingsCount; i++)
+                    {
+                        // Get the settings and the already existing surfaces
+                        NavMeshBuildSettings settings = NavMesh.GetSettingsByIndex(i);
+                        NavMeshSurface navMeshSurface = (from s in environmentObject.GetComponents<NavMeshSurface>()
+                                                         where s.agentTypeID == settings.agentTypeID
+                                                         select s).FirstOrDefault();
+                        Plugin.LogDebug($"Checking NavMeshSurface for agent ID {settings.agentTypeID} at index {i}. Exterior surface null? {navMeshSurface == null}");
+                        if (navMeshSurface == null)
+                        {
+                            // Copy what the other exterior NavmeshSurface had
+                            navMeshSurface = environmentObject.AddComponent<NavMeshSurface>();
+                            navMeshSurface.agentTypeID = settings.agentTypeID;
+                            navMeshSurface.defaultArea = existingSurface.defaultArea;
+                            navMeshSurface.useGeometry = existingSurface.useGeometry;
+                            navMeshSurface.collectObjects = existingSurface.collectObjects;
+                            if (existingSurface.collectObjects == CollectObjects.Volume)
+                            {
+                                navMeshSurface.center = existingSurface.center;
+                                navMeshSurface.size = existingSurface.size;
+                            }
+                            navMeshSurface.layerMask = existingSurface.layerMask;
+                            navMeshSurface.minRegionArea = existingSurface.minRegionArea;
+
+                            // This is how Loadstone used to do it
+                            NavMeshData navMeshData = navMeshSurface.navMeshData;
+                            if (navMeshData == null)
+                            {
+                                // This is how BakeNavMesh creates the new data struct, we mimic that here 
+                                navMeshData = new NavMeshData(navMeshSurface.GetBuildSettings().agentTypeID)
+                                {
+                                    position = navMeshSurface.transform.position,
+                                    rotation = navMeshSurface.transform.rotation
+                                };
+                                navMeshSurface.navMeshData = navMeshData;
+                            }
+                            else
+                            {
+                                // Make sure we have the correct position and rotation
+                                navMeshData.position = navMeshSurface.transform.position;
+                                navMeshData.rotation = navMeshSurface.transform.rotation;
+                            }
+                        }
+
+                        // Store the new surface
+                        navMeshSurfaces.Add(navMeshSurface);
+                    }
+                }
+
+                // Rebake the NavMeshes
+                NavMeshSurface[] surfacesToUpdate = navMeshSurfaces.Count > 0 ? navMeshSurfaces.ToArray() : environmentObject.GetComponents<NavMeshSurface>();
+                Plugin.LogInfo($"[RebakeExteriorNavMesh] Rebaking {surfacesToUpdate.Length} surface(s)");
                 RoundManager.Instance.StartCoroutine(UpdateNavMeshDelayed(surfacesToUpdate));
+            }
+            else
+            {
+                Plugin.LogFatal($"[RebakeExteriorNavMesh] Failed to find environment object.......this should NEVER happen.");
             }
         }
 
@@ -394,7 +466,9 @@ namespace NavMeshLib
             RoundManager instanceRM = RoundManager.Instance;
             if (instanceRM != null)
             {
-                instanceRM.StartCoroutine(UpdateNavMeshDelayed(instanceRM.fullBakeSurfaces.ToArray()));
+                NavMeshSurface[] surfacesToUpdate = instanceRM.fullBakeSurfaces.ToArray();
+                Plugin.LogInfo($"[RebakeDunGenNavMesh] Rebaking {surfacesToUpdate.Length} surface(s)");
+                instanceRM.StartCoroutine(UpdateNavMeshDelayed(surfacesToUpdate));
             }
         }
 
@@ -443,6 +517,9 @@ namespace NavMeshLib
         /// <returns></returns>
         public static IEnumerator UpdateNavMeshDelayed(NavMeshSurface[] surfacesToUpdate, Action? onBuildCompleted = null, Action<NavMeshSurface>? onSurfaceBuilt = null)
         {
+            // Wait a frame to make sure everything else has loaded
+            yield return null;
+
             // The game keeps a cache of all of the surfaces that were used for the full bake
             // of the dungeon, I can just loop through those and call UpdateNavMesh!
             AdjacentRoomCullingModified roomCullingModified = StartOfRound.Instance.occlusionCuller;
@@ -453,7 +530,7 @@ namespace NavMeshLib
                 if (navMeshSurface != null)
                 {
                     // Log about what we are updating!
-                    Plugin.LogDebug($"Updating NavMesh for surface {navMeshSurface.gameObject.name}.");
+                    Plugin.LogInfo($"Updating NavMesh for surface {navMeshSurface}.");
 
                     // NOTE: The vanilla game culling causes the NavMesh Generation to fail. Need to force everything to render
                     // before we can safely rebuild the mesh!
@@ -463,20 +540,16 @@ namespace NavMeshLib
                         roomCullingModified.enabled = false;
                     }
 
-                    // Wait for the game to run the OnDisabled code for the AdjacentRoomCullingModified
-                    yield return null;
-                    yield return new WaitForEndOfFrame(); // Just in case.....
-
                     // Build our new mesh!
                     AsyncOperation asyncOperation = navMeshSurface.UpdateNavMesh(navMeshSurface.navMeshData);
                     while (asyncOperation != null && !asyncOperation.isDone)
                     {
-                        Plugin.LogDebug($"Rebuild Progress {asyncOperation.progress * 100}%");
+                        Plugin.LogDebug($"{navMeshSurface} Rebuild Progress {asyncOperation.progress * 100}%");
                         yield return null;
                     }
 
                     // Update the NavMeshData!
-                    Plugin.LogDebug("UpdateNavMesh finished, refreshing surface data.");
+                    Plugin.LogInfo($"{navMeshSurface} UpdateNavMesh finished, refreshing surface data.");
                     navMeshSurface.navMeshData.name = navMeshSurface.gameObject.name;
                     navMeshSurface.RemoveData();
                     Plugin.LogDebug("Removed existing data.");
@@ -500,11 +573,14 @@ namespace NavMeshLib
 
             // Let the user know the build has finished
             onBuildCompleted?.Invoke();
-            Plugin.LogDebug($"Updated all {surfacesToUpdate.Length} NavMeshes.");
+            Plugin.LogInfo($"Updated {surfacesToUpdate.Length} NavMeshe(s).");
         }
 
         private static IEnumerator UpdateNavMeshDelayed(NavMeshSurface surfaceToUpdate, Action? onBuildCompleted = null, Action<NavMeshSurface>? onSurfaceBuilt = null)
         {
+            // Wait a frame to make sure everything else has loaded
+            yield return null;
+
             // The game keeps a cache of all of the surfaces that were used for the full bake
             // of the dungeon, I can just loop through those and call UpdateNavMesh!
             AdjacentRoomCullingModified roomCullingModified = StartOfRound.Instance.occlusionCuller;
@@ -512,7 +588,7 @@ namespace NavMeshLib
             if (surfaceToUpdate != null)
             {
                 // Log about what we are updating!
-                Plugin.LogDebug($"Updating NavMesh for surface {surfaceToUpdate.gameObject.name}.");
+                Plugin.LogInfo($"Updating NavMesh for surface {surfaceToUpdate}.");
 
                 // NOTE: The vanilla game culling causes the NavMesh Generation to fail. Need to force everything to render
                 // before we can safely rebuild the mesh!
@@ -522,20 +598,16 @@ namespace NavMeshLib
                     roomCullingModified.enabled = false;
                 }
 
-                // Wait for the game to run the OnDisabled code for the AdjacentRoomCullingModified
-                yield return null;
-                yield return new WaitForEndOfFrame(); // Just in case.....
-
                 // Build our new mesh!
                 AsyncOperation asyncOperation = surfaceToUpdate.UpdateNavMesh(surfaceToUpdate.navMeshData);
                 while (asyncOperation != null && !asyncOperation.isDone)
                 {
-                    Plugin.LogDebug($"Rebuild Progress {asyncOperation.progress * 100}%");
+                    Plugin.LogDebug($"{surfaceToUpdate} Rebuild Progress {asyncOperation.progress * 100}%");
                     yield return null;
                 }
 
                 // Update the NavMeshData!
-                Plugin.LogDebug("UpdateNavMesh finished, refreshing surface data.");
+                Plugin.LogInfo($"{surfaceToUpdate} UpdateNavMesh finished, refreshing surface data.");
                 surfaceToUpdate.navMeshData.name = surfaceToUpdate.gameObject.name;
                 surfaceToUpdate.RemoveData();
                 Plugin.LogDebug("Removed existing data.");
@@ -558,7 +630,7 @@ namespace NavMeshLib
 
             // Let the user know the build has finished
             onBuildCompleted?.Invoke();
-            Plugin.LogDebug($"Finished updating {surfaceToUpdate}.");
+            Plugin.LogInfo($"Finished updating {surfaceToUpdate}.");
         }
 
         #endregion

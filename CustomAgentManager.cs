@@ -1,4 +1,5 @@
-﻿using System;
+﻿using NavMeshLib.Patches;
+using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Text;
@@ -29,6 +30,9 @@ namespace NavMeshLib
         /// <summary>
         /// A public readonly collection of registered agent names
         /// </summary>
+        /// <remarks>
+        /// WARNING: This doesn't include the default agent name!
+        /// </remarks>
         public static IReadOnlyCollection<string> RegisteredAgentNames => agentIDsByName.Keys;
 
         private static readonly Dictionary<int, NavMeshBuildSettings> registeredAgents = new Dictionary<int, NavMeshBuildSettings>();
@@ -135,6 +139,11 @@ namespace NavMeshLib
             NavMesh.RemoveSettings(agentTypeID);
         }
 
+        /// <summary>
+        /// Gets an agent ID from the given settings name
+        /// </summary>
+        /// <param name="agentName">The name of the agent type</param>
+        /// <returns>The found agent ID or <see cref="INVALID_AGENT_ID"/> on failure</returns>
         public static int GetAgentIDFromSettingsName(string agentName)
         {
             // Handle default
@@ -158,7 +167,8 @@ namespace NavMeshLib
         /// <remarks>
         /// For some reason, Unity never exposed the method to update <see cref="NavMeshBuildSettings"/>, but thanks to Harmony,
         /// we can just manually override the settings right as Unity returns them. <br/> 
-        /// Check out <see cref="NavMeshPath"/> to see how this is done
+        /// Check out <see cref="NavMeshPatch"/> to see how this is done. <br/>
+        /// For Modders: Use <see cref="NavMesh.GetSettingsByID(int)"/> or <seealso cref="NavMesh.GetSettingsByIndex(int)"/>, as NavMeshLib overrides them internally
         /// </remarks>
         /// <param name="buildSettings"></param>
         internal static void OverrideNavMeshSettings(ref NavMeshBuildSettings buildSettings)
@@ -190,7 +200,8 @@ namespace NavMeshLib
         /// <remarks>
         /// For some reason, Unity never exposed a way to change the internal name, but thanks to Harmony,
         /// we can just manually override the name right as Unity returns them. <br/> 
-        /// Check out <see cref="NavMeshPath"/> to see how this is done
+        /// Check out <see cref="NavMeshPatch"/> to see how this is done. <br/>
+        /// For Modders: Use <see cref="NavMesh.GetSettingsNameFromID(int)"/>, as NavMeshLib overrides it internally
         /// </remarks>
         /// <param name="agentTypeID"></param>
         /// <param name="agentName"></param>

@@ -116,6 +116,10 @@ namespace NavMeshLib.Editor
             }
         }
 
+        /// <summary>
+        /// Helper function for NavMesh stuff that only works with 1 agent ID
+        /// </summary>
+        /// <param name="agentIDs"></param>
         private void UpdateIfSingleAgent(List<int> agentIDs)
         {
             // Only do this if the size is 1
@@ -154,6 +158,12 @@ namespace NavMeshLib.Editor
             }
         }
 
+        /// <summary>
+        /// Helper function for getting the correct components based on <see cref="includesChildren"/>
+        /// </summary>
+        /// <typeparam name="T"></typeparam>
+        /// <param name="enabled"></param>
+        /// <returns></returns>
         private T[] GetNavMeshComponents<T>(bool enabled)
             where T : Component
         {

@@ -26,9 +26,13 @@ namespace NavMeshLib
         {
             Logger = base.Logger;
 
+            // Log what we are about todo
+            Plugin.LogInfo("Loading Required Patches");
+
             // Load our patches
             PatchClass<NavMeshPatch>();
             PatchClass<RoundManagerPatch>();
+            PatchClass<UnityNavMeshAdapterPatch>();
 
             Plugin.LogInfo($"Plugin {MyPluginInfo.PLUGIN_GUID} is loaded!");
         }
@@ -38,11 +42,12 @@ namespace NavMeshLib
         {
             try
             {
+                Plugin.LogDebug($"Patching {typeof(T)}");
                 _harmony.PatchAll(typeof(T));
             }
             catch (Exception e)
             {
-                Plugin.LogError($"An error occured while patching {nameof(T)}: {e}");
+                Plugin.LogError($"An error occured while patching {typeof(T)}: {e}");
             }
         }
 
