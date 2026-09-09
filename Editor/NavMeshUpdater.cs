@@ -19,8 +19,11 @@ namespace NavMeshLib.Editor
         [Tooltip("What surfaces should be rebuild when UpdateNavMesh is called?")]
         public RebuildType rebuildType = RebuildType.AllSurfaces;
 
-        [Tooltip("NavMesh surfaces to update when using SelectedSurfaces.")]
+        [Tooltip("NavMesh surfaces to update when using Custom.")]
         public NavMeshSurface[]? surfacesToUpdate;
+
+        [Tooltip("The environment GameObject to update the NavMesh for when using OutsideSurfaces. If left empty, we attempt to find a GameObject with the tag OutsideLevelNavMesh.")]
+        public GameObject? environmentObject;
 
         /// <summary>
         /// Updates the current scene's NavMesh based on <see cref="rebuildType"/>
@@ -32,7 +35,7 @@ namespace NavMeshLib.Editor
             switch (rebuildType)
             {
                 case RebuildType.OutsideSurfaces:
-                    NavMeshUtil.RebakeExteriorNavMesh();
+                    NavMeshUtil.RebakeExteriorNavMesh(environmentObject: environmentObject);
                     return;
                 case RebuildType.InsideSurfaces:
                     NavMeshUtil.RebakeDunGenNavMesh();

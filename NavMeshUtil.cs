@@ -379,7 +379,9 @@ namespace NavMeshLib
         /// </summary>
         /// <param name="environmentObject">When rebaking the exterior NavMesh, you can pass in a custom object. If null, we attempt to find OutsideLevelNavMesh ourself.</param>
         /// <param name="generateNewSurfaces">Should we create new <see cref="NavMeshSurface"/>s if they don't exist for custom agent types</param>
-        public static void RebakeExteriorNavMesh(GameObject? environmentObject = null, bool generateNewSurfaces = false)
+        /// <param name="onBuildCompleted">Called once the build is finished.</param>
+        /// <param name="onSurfaceBuilt">Called once a <see cref="NavMeshSurface"/> is fully rebaked.</param>
+        public static void RebakeExteriorNavMesh(GameObject? environmentObject = null, bool generateNewSurfaces = false, Action? onBuildCompleted = null, Action<NavMeshSurface>? onSurfaceBuilt = null)
         {
             // Did the user give us the enviorment object
             if (environmentObject == null)
@@ -450,7 +452,7 @@ namespace NavMeshLib
                 // Rebake the NavMeshes
                 NavMeshSurface[] surfacesToUpdate = navMeshSurfaces.Count > 0 ? navMeshSurfaces.ToArray() : environmentObject.GetComponents<NavMeshSurface>();
                 Plugin.LogInfo($"[RebakeExteriorNavMesh] Rebaking {surfacesToUpdate.Length} surface(s)");
-                RoundManager.Instance.StartCoroutine(UpdateNavMeshDelayed(surfacesToUpdate));
+                RoundManager.Instance.StartCoroutine(UpdateNavMeshDelayed(surfacesToUpdate, onBuildCompleted, onSurfaceBuilt));
             }
             else
             {
@@ -461,14 +463,16 @@ namespace NavMeshLib
         /// <summary>
         /// A helper function that rebakes the entire dungen NavMesh
         /// </summary>
-        public static void RebakeDunGenNavMesh()
+        /// <param name="onBuildCompleted">Called once the build is finished.</param>
+        /// <param name="onSurfaceBuilt">Called once a <see cref="NavMeshSurface"/> is fully rebaked.</param>
+        public static void RebakeDunGenNavMesh(Action? onBuildCompleted = null, Action<NavMeshSurface>? onSurfaceBuilt = null)
         {
             RoundManager instanceRM = RoundManager.Instance;
             if (instanceRM != null)
             {
                 NavMeshSurface[] surfacesToUpdate = instanceRM.fullBakeSurfaces.ToArray();
                 Plugin.LogInfo($"[RebakeDunGenNavMesh] Rebaking {surfacesToUpdate.Length} surface(s)");
-                instanceRM.StartCoroutine(UpdateNavMeshDelayed(surfacesToUpdate));
+                instanceRM.StartCoroutine(UpdateNavMeshDelayed(surfacesToUpdate, onBuildCompleted, onSurfaceBuilt));
             }
         }
 
@@ -573,7 +577,7 @@ namespace NavMeshLib
 
             // Let the user know the build has finished
             onBuildCompleted?.Invoke();
-            Plugin.LogInfo($"Updated {surfacesToUpdate.Length} NavMeshe(s).");
+            Plugin.LogInfo($"Updated {surfacesToUpdate.Length} NavMeshes.");
         }
 
         private static IEnumerator UpdateNavMeshDelayed(NavMeshSurface surfaceToUpdate, Action? onBuildCompleted = null, Action<NavMeshSurface>? onSurfaceBuilt = null)

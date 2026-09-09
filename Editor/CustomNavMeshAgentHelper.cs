@@ -74,6 +74,7 @@ namespace NavMeshLib.Editor
             NavMeshModifierVolume[] volumeModifiers = GetNavMeshComponents<NavMeshModifierVolume>(updateNavMeshModifierVolumes);
 
             // Standard NavMeshModifiers
+            const int ALL_AGENTS_ID = -1; // Unity uses this to represnt the modifier affects all agents
             for (int i = 0; i < modifiers.Length; i++)
             {
                 var modifiersSurface = modifiers[i];
@@ -85,7 +86,7 @@ namespace NavMeshLib.Editor
                         m_AffectedAgents.Clear();
                         m_AffectedAgents.AddRange(agentIDs);
                     }
-                    else
+                    else if (modifiersSurface.m_AffectedAgents[0] != ALL_AGENTS_ID)
                     {
                         HashSet<int> oldAffectedAgents = modifiersSurface.m_AffectedAgents.ToHashSet();
                         oldAffectedAgents.UnionWith(agentIDs);
@@ -106,7 +107,7 @@ namespace NavMeshLib.Editor
                         m_AffectedAgents.Clear();
                         m_AffectedAgents.AddRange(agentIDs);
                     }
-                    else
+                    else if (volumeModifier.m_AffectedAgents[0] != ALL_AGENTS_ID)
                     {
                         HashSet<int> oldAffectedAgents = volumeModifier.m_AffectedAgents.ToHashSet();
                         oldAffectedAgents.UnionWith(agentIDs);
