@@ -17,24 +17,45 @@ namespace NavMeshLib.Editor
     /// </remarks>
     public class CustomNavMeshAgentHelper : MonoBehaviour
     {
+        /// <summary>
+        /// The custom agents' names to use
+        /// </summary>
         [Tooltip("The custom agents' names to use")]
         public string[] agentNames = { CustomAgentManager.DEFAULT_AGENT_NAME };
 
+        /// <summary>
+        /// Should this affect child objects as well?
+        /// </summary>
         [Tooltip("Should this affect child objects as well?")]
         public bool includesChildren = false;
 
+        /// <summary>
+        /// For NavMeshModifier and NavMeshModifierVolume only! Should this override the previously set agent types?
+        /// </summary>
         [Tooltip("For NavMeshModifier and NavMeshModifierVolume only! Should this override the previously set agent types?")]
         public bool overridePreviousAgentTypes = false;
 
+        /// <summary>
+        /// Should we affect attached NavMeshSurfaces?
+        /// </summary>
         [Tooltip("Should we affect attached NavMeshSurfaces?")]
         public bool updateNavMeshSurfaces = true;
 
+        /// <summary>
+        /// Should we affect attached NavMeshModifiers?
+        /// </summary>
         [Tooltip("Should we affect attached NavMeshModifiers?")]
         public bool updateNavMeshModifiers = true;
 
+        /// <summary>
+        /// Should we affect attached NavMeshModifierVolumes?
+        /// </summary>
         [Tooltip("Should we affect attached NavMeshModifierVolumes?")]
         public bool updateNavMeshModifierVolumes = true;
 
+        /// <summary>
+        /// Should we affect attached NavMeshLinks?
+        /// </summary>
         [Tooltip("Should we affect attached NavMeshLinks?")]
         public bool updateNavMeshLinks = true;
 

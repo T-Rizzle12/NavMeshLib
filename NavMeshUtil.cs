@@ -383,7 +383,7 @@ namespace NavMeshLib
         /// <param name="onSurfaceBuilt">Called once a <see cref="NavMeshSurface"/> is fully rebaked.</param>
         public static void RebakeExteriorNavMesh(GameObject? environmentObject = null, bool generateNewSurfaces = false, Action? onBuildCompleted = null, Action<NavMeshSurface>? onSurfaceBuilt = null)
         {
-            // Did the user give us the enviorment object
+            // Did the user give us the environment object
             if (environmentObject == null)
             {
                 environmentObject = GameObject.FindGameObjectWithTag("OutsideLevelNavMesh");
@@ -518,6 +518,43 @@ namespace NavMeshLib
         /// <param name="surfacesToUpdate">The surfaces to rebake.</param>
         /// <param name="onBuildCompleted">Called once the build is finished.</param>
         /// <param name="onSurfaceBuilt">Called once a <see cref="NavMeshSurface"/> is fully rebaked.</param>
+        public static void BuildNavMeshAsync(NavMeshSurface[] surfacesToUpdate, Action? onBuildCompleted = null, Action<NavMeshSurface>? onSurfaceBuilt = null)
+        {
+            // Go and prep all surfaces to rebake
+            for (int i = 0; i < surfacesToUpdate.Length; i++)
+            {
+                NavMeshSurface? navMeshSurface = surfacesToUpdate[i];
+                if (navMeshSurface != null)
+                {
+                    // Actually build the mesh
+                    NavMeshData navMeshData = navMeshSurface.navMeshData;
+                    if (navMeshData == null)
+                    {
+                        navMeshData = new NavMeshData(navMeshSurface.GetBuildSettings().agentTypeID)
+                        {
+                            position = navMeshSurface.transform.position,
+                            rotation = navMeshSurface.transform.rotation
+                        };
+                        navMeshSurface.navMeshData = navMeshData;
+                    }
+                    else
+                    {
+                        navMeshData.position = navMeshSurface.transform.position;
+                        navMeshData.rotation = navMeshSurface.transform.rotation;
+                    }
+                }
+            }
+
+            // Actually update the NavMesh
+            RoundManager.Instance.StartCoroutine(UpdateNavMeshDelayed(surfacesToUpdate, onBuildCompleted, onSurfaceBuilt));
+        }
+
+        /// <summary>
+        /// Asynchronously rebuilds the NavMesh for the array of <see cref="NavMeshSurface"/>s
+        /// </summary>
+        /// <param name="surfacesToUpdate">The surfaces to rebake.</param>
+        /// <param name="onBuildCompleted">Called once the build is finished.</param>
+        /// <param name="onSurfaceBuilt">Called once a <see cref="NavMeshSurface"/> is fully rebaked.</param>
         /// <returns></returns>
         public static IEnumerator UpdateNavMeshDelayed(NavMeshSurface[] surfacesToUpdate, Action? onBuildCompleted = null, Action<NavMeshSurface>? onSurfaceBuilt = null)
         {
@@ -570,7 +607,7 @@ namespace NavMeshLib
 
             // Turn the vanilla game culling back on!
             roomCullingModified ??= StartOfRound.Instance.occlusionCuller;
-            if (roomCullingModified != null && roomCullingModified.enabled != wasEnabled)
+            if (roomCullingModified != null && wasEnabled && !roomCullingModified.enabled)
             {
                 roomCullingModified.enabled = wasEnabled;
             }
@@ -627,7 +664,7 @@ namespace NavMeshLib
 
             // Turn the vanilla game culling back on!
             roomCullingModified ??= StartOfRound.Instance.occlusionCuller;
-            if (roomCullingModified != null && roomCullingModified.enabled != wasEnabled)
+            if (roomCullingModified != null && wasEnabled && !roomCullingModified.enabled)
             {
                 roomCullingModified.enabled = wasEnabled;
             }
