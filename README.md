@@ -27,6 +27,13 @@ OutsideSurfaces - Only rebakes NavMeshSurfaces parented to the OutsideLevelNavMe
 InsideSurfaces - Only rebakes NavMeshSurfaces in the RoundManager.Instance.fullBakeSurfaces. <br/>
 Custom - Allows you to specify which NavMeshSurfaces to rebake. WARNING: You are responsible for rebaking custom agent surfaces, if you use this, as well!<br/>
 
+## CustomNavMeshModifier
+A helper mono behavior that allows moon makers to dynamically create NavMeshModifierVolume(s) for custom interiors, traps, and so much more. <br/>
+You can customized where the modifier is parented to: <br/>
+Interior - The modifier is parented to the Dungen object. <br/>
+MoonEnvironment - The modifier is parented to the OutsideLevelNavMesh object. <br/>
+Custom - The modifier is parented to the object you specify. <br/>
+
 # NavMesh Generation Improvements
 NavMesh Lib also improves NavMesh generation by using **UpdateNavMesh** instead of **BuildNavMesh**. <br/>
 Unity NavMesh generation is already multi-threaded but **BuildNavMesh** waits until the NavMesh is ready which block the main thread. <br/>

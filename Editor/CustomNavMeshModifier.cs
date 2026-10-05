@@ -109,6 +109,8 @@ namespace NavMeshLib.Editor
 
         private float timeStationary = 0.0f;
 
+        private bool isDestroying = false;
+
         private void Awake()
         {
             // Only do this if we were not provided one already
@@ -127,6 +129,45 @@ namespace NavMeshLib.Editor
             if (initOnStart)
             {
                 InitializeCustomModifier();
+            }
+        }
+
+        private void OnEnable()
+        {
+            // Don't do this if we are not initialized
+            if (!initialized) return;
+
+            // Enable our proxy object and all of it's modifiers
+            if (rootModifierObject != null)
+            {
+                // Set the root as active
+                rootModifierObject.SetActive(true);
+
+                // Update the NavMesh we are attached to.
+                if (navMeshUpdater != null)
+                {
+                    navMeshUpdater.UpdateNavMesh();
+                }
+            }
+        }
+
+        private void OnDisable()
+        {
+            // Don't do this if we are not initialized or
+            // if we are being destroyed (OnDestroy will handle this)
+            if (!initialized || isDestroying) return;
+
+            // Disable our proxy object and all of it's modifiers
+            if (rootModifierObject != null)
+            {
+                // Set the root as inactive
+                rootModifierObject.SetActive(false);
+
+                // Update the NavMesh we are attached to.
+                if (navMeshUpdater != null)
+                {
+                    navMeshUpdater.UpdateNavMesh();
+                }
             }
         }
 
@@ -215,6 +256,14 @@ namespace NavMeshLib.Editor
             modifier.initOnStart = false;
             modifier.modifierLocation = modifierLocation;
             modifier.autoRebuildNavMesh = false;
+
+            // Make sure we have a NavMeshUpdater
+            modifier.navMeshUpdater ??= modifier.GetComponent<NavMeshUpdater>(); // See if the NavMeshUpdater already exists on the root object
+            if (modifier.navMeshUpdater == null)
+            {
+                modifier.navMeshUpdater = modifier.gameObject.AddComponent<NavMeshUpdater>(); // Create one with default settings
+            }
+
             return modifier;
         }
 
@@ -438,6 +487,9 @@ namespace NavMeshLib.Editor
 
         private void OnDestroy()
         {
+            // Update our flag
+            isDestroying = true;
+
             // Destroy our proxy game object
             // We have to do this since we reparented rootModifierObject
             // and we need to guarantee the root object is destroyed as well.

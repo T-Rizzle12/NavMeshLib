@@ -1,5 +1,9 @@
 # Changelog
 
+## 3.1.0 - 2026-10-5
+- Fixed CustomNavMeshModifier not rebaking the Navmesh if it was disabled or re-enabled.
+- Fixed a bug with CustomNavMeshModifier.CreateFromColliders sometimes not creating and adding NavMeshUpdater to the newly created CustomNavMeshModifier.
+
 ## 3.0.0 - 2026-10-1
 It's time for a requested feature that has been asked for a while now.
 The ability to dynamically create NavMeshModifierVolumes anything you want,
