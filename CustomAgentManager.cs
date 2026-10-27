@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Text;
+using Unity.AI.Navigation;
 using UnityEngine.AI;
 
 namespace NavMeshLib
@@ -25,6 +26,10 @@ namespace NavMeshLib
         /// <summary>
         /// The invaild agent ID as defined by Unity
         /// </summary>
+        /// <remarks>
+        /// This is also used by some objects <see cref="NavMeshModifier"/> 
+        /// and <seealso cref="NavMeshModifierVolume"/> to represent ALL agent IDs.
+        /// </remarks>
         public const int INVALID_AGENT_ID = -1;
 
         /// <summary>

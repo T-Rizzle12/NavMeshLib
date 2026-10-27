@@ -116,9 +116,11 @@ namespace NavMeshLib.Editor
             // Only do this if we were not provided one already
             if (navMeshUpdater == null)
             {
+                Plugin.LogWarning($"[CustomNavMeshModifier] ({name}) navMeshUpdater was not set, attempting to find NavMeshUpdater component.");
                 navMeshUpdater = GetComponent<NavMeshUpdater>(); // Check if the user forgot to set it.
                 if (navMeshUpdater == null)
                 {
+                    Plugin.LogError($"[CustomNavMeshModifier] ({name}) failed to find NavMeshUpdater! Auto creating with default settings!");
                     navMeshUpdater = gameObject.AddComponent<NavMeshUpdater>(); // Create one with default settings
                 }
             }
@@ -441,8 +443,7 @@ namespace NavMeshLib.Editor
                     }
 
                     // Update the proxy object's current position and rotation
-                    rootModifierObject.transform.position = transform.position;
-                    rootModifierObject.transform.rotation = transform.rotation;
+                    rootModifierObject.transform.SetPositionAndRotation(transform.position, transform.rotation);
 
                     if (!autoRebuildWhenStationary 
                         || timeStationary > autoRebuildTimeToStationary)

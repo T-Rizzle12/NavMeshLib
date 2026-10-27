@@ -1,9 +1,9 @@
-﻿using System;
+﻿using NavMeshLib.Editor;
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.CompilerServices;
-using System.Text;
 using Unity.AI.Navigation;
 using Unity.Mathematics;
 using UnityEngine;
@@ -95,7 +95,6 @@ namespace NavMeshLib
         /// <param name="maxRangeToEnd">The maximum range the nearest NavArea will the path be considered vaild</param>
         /// <param name="pathDistance">The entire length of the path</param>
         /// <returns><see langword="true"/> if a valid and complete path exists; otherwise, <see langword="false"/></returns>
-
         public static bool IsValidPathToTarget(Vector3 startPosition, Vector3 endPosition, NavMeshQueryFilter queryFilter, ref NavMeshPath path, out float pathDistance, bool calculatePathDistance = false, float nearestNavAreaRange = 2.7f, float maxRangeToEnd = 1.5f)
         {
             // Check if we can create a path there first!
@@ -139,28 +138,45 @@ namespace NavMeshLib
         public static bool IsValidPathToTarget(this NavMeshAgent navMeshAgent, Vector3 startPosition, Vector3 endPosition, ref NavMeshPath path, out float pathDistance, bool calculatePathDistance = false, float nearestNavAreaRange = 2.7f, float maxRangeToEnd = 1.5f)
         #pragma warning restore CS1573 // Parameter has no matching param tag in the XML comment (but other parameters do)
         {
+            // Use the NavMeshAgent's Query Object
+            return IsValidPathToTarget(startPosition, endPosition, navMeshAgent.GetNavMeshQueryFilter(), ref path, out pathDistance, calculatePathDistance, nearestNavAreaRange, maxRangeToEnd);
+        }
+
+        /// <summary>
+        /// Helper method that creates a <see cref="NavMeshQueryFilter"/> for this agent.
+        /// </summary>
+        /// <remarks>
+        /// If the agent is disabled, the area costs will be set the defaults determined by the game developer.
+        /// </remarks>
+        /// <param name="navMeshAgent">The agent to build the Query Filter for</param>
+        /// <returns></returns>
+        public static NavMeshQueryFilter GetNavMeshQueryFilter(this NavMeshAgent navMeshAgent)
+        {
+            // Create our filter
+            NavMeshQueryFilter queryFilter = new NavMeshQueryFilter() { agentTypeID = navMeshAgent.agentTypeID, areaMask = navMeshAgent.areaMask };
+
             // Get the area costs from the agent
-            float[] costs = new float[32];
-            if (navMeshAgent.enabled)
+            const int MAX_AREA_COSTS = 32;
+            if (navMeshAgent.enabled && navMeshAgent.isOnNavMesh)
             {
                 // If the agent is enabled, we can get the area costs directly from the agent
-                for (int i = 0; i < costs.Length; i++)
+                for (int i = 0; i < MAX_AREA_COSTS; i++)
                 {
-                    costs[i] = navMeshAgent.GetAreaCost(i);
+                    queryFilter.SetAreaCost(i, navMeshAgent.GetAreaCost(i));
                 }
             }
             else
             {
                 // If the agent is disabled, we can still get the area costs from the NavMesh itself
                 // This is the default area costs as defined in the Unity Editor.
-                for (int i = 0; i < costs.Length; i++)
+                for (int i = 0; i < MAX_AREA_COSTS; i++)
                 {
-                    costs[i] = NavMesh.GetAreaCost(i);
+                    queryFilter.SetAreaCost(i, NavMesh.GetAreaCost(i));
                 }
             }
 
-            NavMeshQueryFilter navMeshQuery = new NavMeshQueryFilter() { agentTypeID = navMeshAgent.agentTypeID, areaMask = navMeshAgent.areaMask, costs = costs };
-            return IsValidPathToTarget(startPosition, endPosition, navMeshQuery, ref path, out pathDistance, calculatePathDistance, nearestNavAreaRange, maxRangeToEnd);
+            // Build the Query Object
+            return queryFilter;
         }
 
         #endregion
@@ -398,7 +414,9 @@ namespace NavMeshLib
                 {
                     // This exists to allow us to add custom NavMeshSurfaces for all custom agent
                     // types that were registered earlier
-                    NavMeshSurface existingSurface = environmentObject.GetComponent<NavMeshSurface>();
+                    NavMeshSurface existingSurface = (from s in environmentObject.GetComponents<NavMeshSurface>()
+                                                      where s.agentTypeID == CustomAgentManager.DEFAULT_AGENT_ID // Find the NavMeshSurface for the default agent ID.
+                                                      select s).FirstOrDefault();
                     int settingsCount = NavMesh.GetSettingsCount();
                     for (int i = 0; i < settingsCount; i++)
                     {
@@ -456,7 +474,7 @@ namespace NavMeshLib
             }
             else
             {
-                Plugin.LogFatal($"[RebakeExteriorNavMesh] Failed to find environment object.......this should NEVER happen.");
+                Plugin.LogFatal("[RebakeExteriorNavMesh] Failed to find environment object.......this should NEVER happen.");
             }
         }
 
@@ -483,10 +501,13 @@ namespace NavMeshLib
         /// <summary>
         /// Asynchronously rebuilds the NavMesh for the current <see cref="NavMeshSurface"/>
         /// </summary>
+        /// <remarks>
+        /// WARNING: The <see cref="NavMeshSurface"/> object MUST BE ENABLED or else this will fail! <br/>
+        /// </remarks>
         /// <param name="navMeshSurface">The surface to bake for.</param>
         /// <param name="onBuildCompleted">Called once the build is finished.</param>
         /// <param name="onSurfaceBuilt">Called once a <see cref="NavMeshSurface"/> is fully rebaked.</param>
-        /// <returns>A coroutine allowing you to cancel the operation early.</returns>
+        /// <returns></returns>
         public static void BuildNavMeshAsync(this NavMeshSurface navMeshSurface, Action? onBuildCompleted = null, Action<NavMeshSurface>? onSurfaceBuilt = null)
         {
             // This is how Loadstone used to do it
@@ -561,8 +582,9 @@ namespace NavMeshLib
             // Wait a frame to make sure everything else has loaded
             yield return null;
 
-            // The game keeps a cache of all of the surfaces that were used for the full bake
-            // of the dungeon, I can just loop through those and call UpdateNavMesh!
+            // Cache information about the interior culling system!
+            int completedOperations = 0;
+            List<(AsyncOperation operation, NavMeshSurface surface)> asyncOperations = new List<(AsyncOperation, NavMeshSurface)>(surfacesToUpdate.Length);
             AdjacentRoomCullingModified roomCullingModified = StartOfRound.Instance.occlusionCuller;
             bool wasEnabled = roomCullingModified.enabled;
             for (int i = 0; i < surfacesToUpdate.Length; i++)
@@ -583,26 +605,56 @@ namespace NavMeshLib
 
                     // Build our new mesh!
                     AsyncOperation asyncOperation = navMeshSurface.UpdateNavMesh(navMeshSurface.navMeshData);
-                    while (asyncOperation != null && !asyncOperation.isDone)
+                    asyncOperation.completed += (AsyncOperation operation) =>
                     {
-                        Plugin.LogDebug($"{navMeshSurface} Rebuild Progress {asyncOperation.progress * 100}%");
-                        yield return null;
-                    }
+                        try
+                        {
+                            // Update the NavMeshData!
+                            Plugin.LogInfo($"{navMeshSurface} UpdateNavMesh finished, refreshing surface data.");
+                            navMeshSurface.navMeshData.name = navMeshSurface.gameObject.name;
+                            navMeshSurface.RemoveData();
+                            Plugin.LogDebug("Removed existing data.");
+                            if (navMeshSurface.isActiveAndEnabled)
+                            {
+                                navMeshSurface.AddData();
+                                Plugin.LogDebug("Added updated data.");
+                            }
 
-                    // Update the NavMeshData!
-                    Plugin.LogInfo($"{navMeshSurface} UpdateNavMesh finished, refreshing surface data.");
-                    navMeshSurface.navMeshData.name = navMeshSurface.gameObject.name;
-                    navMeshSurface.RemoveData();
-                    Plugin.LogDebug("Removed existing data.");
-                    if (navMeshSurface.isActiveAndEnabled)
-                    {
-                        navMeshSurface.AddData();
-                        Plugin.LogDebug("Added updated data.");
-                    }
+                            // Call the related action
+                            onSurfaceBuilt?.Invoke(navMeshSurface);
+                        }
+                        catch (Exception e)
+                        {
+                            Plugin.LogError($"Error finishing NavMesh update: {e}");
+                        }
+                        finally
+                        {
+                            completedOperations++;
+                        }
+                    };
 
-                    // Call the related action
-                    onSurfaceBuilt?.Invoke(navMeshSurface);
+                    // Cache the operation
+                    asyncOperations.Add((asyncOperation, navMeshSurface));
                 }
+            }
+
+            // Wait until all operations have finished
+            while (completedOperations < asyncOperations.Count)
+            {
+                // Report the status of all the operations every frame
+                for (int i = 0; i < asyncOperations.Count; i++)
+                {
+                    // Grab the information about this surface update from our list
+                    // and log our current progress
+                    var (operation, surface) = asyncOperations[i];
+                    if (operation != null && !operation.isDone)
+                    {
+                        Plugin.LogDebug($"{surface} Rebuild Progress {operation.progress * 100}%");
+                    }
+                }
+
+                // Wait a frame as we still have NavMeshes to bake
+                yield return null;
             }
 
             // Turn the vanilla game culling back on!
@@ -622,8 +674,7 @@ namespace NavMeshLib
             // Wait a frame to make sure everything else has loaded
             yield return null;
 
-            // The game keeps a cache of all of the surfaces that were used for the full bake
-            // of the dungeon, I can just loop through those and call UpdateNavMesh!
+            // Cache information about the interior culling system!
             AdjacentRoomCullingModified roomCullingModified = StartOfRound.Instance.occlusionCuller;
             bool wasEnabled = roomCullingModified.enabled;
             if (surfaceToUpdate != null)
@@ -672,6 +723,237 @@ namespace NavMeshLib
             // Let the user know the build has finished
             onBuildCompleted?.Invoke();
             Plugin.LogInfo($"Finished updating {surfaceToUpdate}.");
+        }
+
+        #endregion
+
+        #region NavMesh Helpers
+
+        /// <summary>
+        /// Finds all of the <see cref="OffMeshLink"/>s on the given GameObject and 
+        /// creates copies for all custom agent types.
+        /// </summary>
+        /// <param name="gameObject">The object to copy links for</param>
+        /// <param name="destroyOldOffMeshLinks">Should the <see cref="OffMeshLink"/>(s) be destoryed once we have finished? <br/> WARNING: This will prevent the auto generated link(s) from mimicing it's <see cref="OffMeshLink.activated"/> status.</param>
+        public static void CopyOffMeshLinks(GameObject gameObject, bool destroyOldOffMeshLinks = false)
+        {
+            OffMeshLink[] offMeshLinks = gameObject.GetComponentsInChildren<OffMeshLink>(includeInactive: true);
+            for (int i = 0; i < offMeshLinks.Length; i++)
+            {
+                var offMeshLink = offMeshLinks[i];
+                if (offMeshLink != null)
+                {
+                    if (CopyOffMeshLink(offMeshLink, destroyOldOffMeshLinks))
+                    {
+                        Plugin.LogInfo($"Successfully added NavMeshLinks to OffMeshLink {offMeshLink.name}.");
+                    }
+                    else
+                    {
+                        Plugin.LogWarning($"Skipping OffMeshLink {offMeshLink.name} due to invalid start or end position...this may cause issues.");
+                    }
+                }
+            }
+        }
+
+        /// <summary>
+        /// Copies the given <see cref="OffMeshLink"/> and 
+        /// creates copies for all custom agent types.
+        /// </summary>
+        /// <param name="linkToCopy"></param>
+        /// <param name="destroyOldOffMeshLink">Should the <see cref="OffMeshLink"/> be destoryed once we have finished? <br/> WARNING: This will prevent the auto generated link(s) from mimicing it's <see cref="OffMeshLink.activated"/> status.</param>
+        /// <returns><see langword="true"/> if we managed to copy for all custom agent types; otherwise <see langword="false"/></returns>
+        public static bool CopyOffMeshLink(OffMeshLink linkToCopy, bool destroyOldOffMeshLink = false)
+        {
+            if (linkToCopy.startTransform == null 
+                || linkToCopy.endTransform == null)
+            {
+                return false;
+            }
+
+            // Now we need to also accomodate for other agent ids
+            int settingsCount = NavMesh.GetSettingsCount();
+            for (int j = 0; j < settingsCount; j++)
+            {
+                // Get the settings from the NavMesh manager
+                CopyOffMeshLink(linkToCopy, NavMesh.GetSettingsByIndex(j).agentTypeID, destroyOldOffMeshLink);
+            }
+
+            return true;
+        }
+
+        /// <summary>
+        /// Copies the given <see cref="OffMeshLink"/> and 
+        /// creates copies for all custom agent types.
+        /// </summary>
+        /// <param name="linkToCopy"></param>
+        /// <param name="agentTypeID">The <see cref="NavMeshAgent.agentTypeID"/> to copy a link for.</param>
+        /// <param name="destroyOldOffMeshLink">Should the <see cref="OffMeshLink"/> be destoryed once we have finished? <br/> WARNING: This will prevent the auto generated link from mimicing it's <see cref="OffMeshLink.activated"/> status.</param>
+        /// <returns><see langword="true"/> if we managed to create a copy for the given <paramref name="agentTypeID"/>; otherwise <see langword="false"/></returns>
+        public static bool CopyOffMeshLink(OffMeshLink linkToCopy, int agentTypeID, bool destroyOldOffMeshLink = false)
+        {
+            // Were we given a valid agent ID
+            if (NavMesh.GetSettingsByID(agentTypeID).agentTypeID == CustomAgentManager.INVALID_AGENT_ID)
+            {
+                Plugin.LogError($"[NavMeshUtil.CopyOffMeshLink] was given an invaild agent ID: {agentTypeID}");
+                return false;
+            }
+
+            // Make sure the OffMeshLink is valid
+            if (linkToCopy.startTransform == null
+                || linkToCopy.endTransform == null)
+            {
+                Plugin.LogError($"[NavMeshUtil.CopyOffMeshLink] was given an OffMeshLink: {linkToCopy}");
+                return false;
+            }
+
+            // Get the settings and the already existing NavMeshLinks
+            if (!destroyOldOffMeshLink && agentTypeID == CustomAgentManager.DEFAULT_AGENT_ID) return false; // OffMeshLinks already work for the default agent!
+            NavMeshLinkHelper navMeshLinkHelper = (from s in linkToCopy.GetComponents<NavMeshLinkHelper>()
+                                                   where IsValildNavMeshLinkHelper(s, agentTypeID, linkToCopy)
+                                                   select s).FirstOrDefault();
+            if (navMeshLinkHelper == null)
+            {
+                navMeshLinkHelper = linkToCopy.gameObject.AddComponent<NavMeshLinkHelper>();
+                var navMeshLink = linkToCopy.gameObject.AddComponent<NavMeshLink>();
+                navMeshLinkHelper.GeneratedByNavMeshLib = true;
+                navMeshLinkHelper.OffMeshToMimic = linkToCopy;
+                navMeshLinkHelper.link = navMeshLink;
+                navMeshLinkHelper.startTransform = linkToCopy.startTransform;
+                navMeshLinkHelper.endTransform = linkToCopy.endTransform;
+
+                navMeshLink.agentTypeID = agentTypeID;
+                navMeshLink.startPoint = NavMeshLinkHelper.WorldToLinkPoint(navMeshLink, linkToCopy.startTransform.position);
+                navMeshLink.endPoint = NavMeshLinkHelper.WorldToLinkPoint(navMeshLink, linkToCopy.endTransform.position);
+                navMeshLink.bidirectional = linkToCopy.biDirectional;
+                navMeshLink.autoUpdate = linkToCopy.autoUpdatePositions;
+                navMeshLink.costModifier = Mathf.RoundToInt(linkToCopy.costOverride);
+                navMeshLink.area = linkToCopy.area;
+            }
+
+            // Make sure its up to date
+            navMeshLinkHelper.SyncPoints();
+
+            // Sanity Check
+            if (linkToCopy != null)
+            {
+                UnityEngine.Object.Destroy(linkToCopy);
+            }
+
+            return true;
+        }
+
+        private static bool IsValildNavMeshLinkHelper(NavMeshLinkHelper navMeshLinkHelper, int agentTypeID, OffMeshLink linkToReplace)
+        {
+            return navMeshLinkHelper.GeneratedByNavMeshLib
+                   && navMeshLinkHelper.link != null
+                   && navMeshLinkHelper.link.agentTypeID == agentTypeID
+                   && navMeshLinkHelper.OffMeshToMimic == linkToReplace;
+        }
+
+        /// <summary>
+        /// Creates <see cref="NavMeshSurface"/>(s) for all agent types on the given GameObject if they don't exist.
+        /// </summary>
+        /// <remarks>
+        /// NOTE: This only works if the given <paramref name="gameObject"/> has at least 1 <see cref="NavMeshSurface"/>.
+        /// </remarks>
+        /// <param name="gameObject">The object to copy surfaces from</param>
+        /// <param name="buildAsync">Should the NavMeshes be baked asynchronously</param>
+        /// <param name="overrideTileSize">Do we ignore the agent tile size and use the <see cref="NavMeshSurface"/>'s instead?</param>
+        /// <param name="overrideVoxelSize">Do we ignore the agent voxel size and use the <see cref="NavMeshSurface"/>'s instead?</param>
+        public static void AddMissingNavMeshSurfaces(GameObject gameObject, bool buildAsync = false, bool overrideTileSize = false, bool overrideVoxelSize = false)
+        {
+            NavMeshSurface[] existingSurfaces = gameObject.GetComponentsInChildren<NavMeshSurface>(includeInactive: true);
+            for (int i = 0; i < existingSurfaces.Length; i++)
+            {
+                AddMissingNavMeshSurfaces(existingSurfaces[i], buildAsync, overrideTileSize, overrideVoxelSize); // Call our helper
+            }
+        }
+
+        /// <summary>
+        /// Creates <see cref="NavMeshSurface"/>(s) for all agent types on the given <see cref="NavMeshSurface"/>'s GameObject if they don't exist.
+        /// </summary>
+        /// <param name="existingSurface">The object to copy surfaces from</param>
+        /// <param name="buildAsync">Should the NavMeshes be baked asynchronously</param>
+        /// <param name="overrideTileSize">Do we ignore the agent tile size and use the <see cref="NavMeshSurface"/>'s instead?</param>
+        /// <param name="overrideVoxelSize">Do we ignore the agent voxel size and use the <see cref="NavMeshSurface"/>'s instead?</param>
+        public static void AddMissingNavMeshSurfaces(NavMeshSurface existingSurface, bool buildAsync = false, bool overrideTileSize = false, bool overrideVoxelSize = false)
+        {
+            // Go through each surface we found and make sure it works for ALL custom NavMeshAgent IDs
+            GameObject existingObject = existingSurface.gameObject;
+            int settingsCount = NavMesh.GetSettingsCount();
+            for (int j = 0; j < settingsCount; j++)
+            {
+                // Get the settings and the already existing surfaces
+                NavMeshBuildSettings settings = NavMesh.GetSettingsByIndex(j);
+                NavMeshSurface navMeshSurface = (from s in existingObject.GetComponents<NavMeshSurface>()
+                                                 where s.agentTypeID == settings.agentTypeID
+                                                 select s).FirstOrDefault();
+                Plugin.LogDebug($"Checking NavMeshSurface for agent ID {settings.agentTypeID} at index {j}. Surface null? {navMeshSurface == null}");
+                if (navMeshSurface == null)
+                {
+                    // Copy what the other exterior NavmeshSurface had
+                    navMeshSurface = existingObject.AddComponent<NavMeshSurface>();
+                    navMeshSurface.agentTypeID = settings.agentTypeID;
+                    navMeshSurface.defaultArea = existingSurface.defaultArea;
+                    navMeshSurface.useGeometry = existingSurface.useGeometry;
+                    navMeshSurface.collectObjects = existingSurface.collectObjects;
+                    if (existingSurface.collectObjects == CollectObjects.Volume)
+                    {
+                        navMeshSurface.center = existingSurface.center;
+                        navMeshSurface.size = existingSurface.size;
+                    }
+                    navMeshSurface.layerMask = existingSurface.layerMask;
+                    navMeshSurface.minRegionArea = existingSurface.minRegionArea;
+
+                    // Do we copy the tile size?
+                    if (overrideTileSize)
+                    {
+                        navMeshSurface.overrideTileSize = existingSurface.overrideTileSize;
+                        navMeshSurface.tileSize = existingSurface.tileSize;
+                    }
+
+                    // Do we copy the voxel size?
+                    if (overrideVoxelSize)
+                    {
+                        navMeshSurface.overrideVoxelSize = existingSurface.overrideVoxelSize;
+                        navMeshSurface.voxelSize = existingSurface.voxelSize;
+                    }
+                }
+
+                // This is how Loadstone used to do it
+                NavMeshData navMeshData = navMeshSurface.navMeshData;
+                if (navMeshData == null)
+                {
+                    // This is how BakeNavMesh creates the new data struct, we mimic that here 
+                    navMeshData = new NavMeshData(navMeshSurface.GetBuildSettings().agentTypeID)
+                    {
+                        position = navMeshSurface.transform.position,
+                        rotation = navMeshSurface.transform.rotation
+                    };
+                    navMeshSurface.navMeshData = navMeshData;
+                }
+                else
+                {
+                    // Make sure we have the correct position and rotation
+                    navMeshData.position = navMeshSurface.transform.position;
+                    navMeshData.rotation = navMeshSurface.transform.rotation;
+                }
+
+                // Build the new surface
+                if (buildAsync && navMeshSurface.isActiveAndEnabled)
+                {
+                    navMeshSurface.BuildNavMeshAsync();
+                }
+                else
+                {
+                    // Warn the user if buildAsync is used on a disabled object
+                    if (buildAsync)
+                    {
+                        Plugin.LogWarning($"[AddMissingNavMeshSurfaces] ({navMeshSurface.name}) was disabled, but Build Async was set. This is not allowed by Unity. Forcing Synchronous generation.");
+                    }
+                    navMeshSurface.BuildNavMesh();
+                }
+            }
         }
 
         #endregion

@@ -83,7 +83,7 @@ namespace NavMeshLib.Editor
 
             if (agentIDs.Count == 0)
             {
-                Plugin.LogWarning($"Unable to find any custom NavMesh agent in '{nameof(agentNames)}' for {gameObject.name}.");
+                Plugin.LogError($"Unable to find any custom NavMesh agent(s) in '{nameof(agentNames)}' for {gameObject.name}.");
                 return;
             }
 
@@ -149,7 +149,7 @@ namespace NavMeshLib.Editor
             {
                 if (agentIDs.Count > 1 && (updateNavMeshSurfaces || updateNavMeshLinks))
                 {
-                    Plugin.LogWarning($"Multiple custom agents were specified for {gameObject.name}. \n NavMeshSurface and NavMeshLink components require a single agent type and will not be modified.");
+                    Plugin.LogWarning($"Multiple custom agents were specified for {gameObject.name}. \n NavMeshSurface and NavMeshLink components only support a single agent type and will not be modified.");
                 }
                 return;
             }
@@ -166,6 +166,7 @@ namespace NavMeshLib.Editor
                 if (navMeshSurface != null)
                 {
                     navMeshSurface.agentTypeID = agentTypeID;
+                    navMeshSurface.BuildNavMeshAsync();
                 }
             }
 

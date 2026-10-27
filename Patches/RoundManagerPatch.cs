@@ -103,6 +103,18 @@ namespace NavMeshLib.Patches
             NavMeshUtil.RebakeExteriorNavMesh(generateNewSurfaces: true);
         }
 
+        /// <summary>
+        /// When the dungeon finishes generating, copy the OffMeshLinks
+        /// </summary>
+        [HarmonyPatch("BakeDunGenNavMesh")]
+        [HarmonyPrefix]
+        static void BakeDunGenNavMesh_PreFix(RoundManager __instance)
+        {
+            // Copy the OffMeshLinks in the interior
+            Plugin.LogInfo("[BakeDunGenNavMesh] Copying OffMeshLinks for custom agents!");
+            NavMeshUtil.CopyOffMeshLinks(__instance.dungeonGenerator.Generator.CurrentDungeon.gameObject);
+        }
+
         internal static void BuildInteriorNavMesh(NavMeshSurface navMeshSurface)
         {
             Plugin.LogInfo($"[BuildInteriorNavMesh] Starting Async NavMesh Generation for interior surface {navMeshSurface} with agent ID {navMeshSurface.agentTypeID}");
