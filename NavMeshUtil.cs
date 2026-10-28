@@ -834,7 +834,8 @@ namespace NavMeshLib
             navMeshLinkHelper.SyncPoints();
 
             // Sanity Check
-            if (linkToCopy != null)
+            if (destroyOldOffMeshLink 
+                && linkToCopy != null)
             {
                 UnityEngine.Object.Destroy(linkToCopy);
             }
