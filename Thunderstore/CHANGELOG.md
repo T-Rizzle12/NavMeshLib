@@ -1,5 +1,21 @@
 # Changelog
 
+## 3.2.0 - 2026-10-29
+Just adding some more stuff to help out with Custom NavMeshAgent IDs. 
+Anyhow, here is the stuff that was added or changed.
+
+- Added AutoNavLinkCreator, A helper mono behavior made to allow moon makers to automatically have NavMeshLinks created for custom agent types at runtime. Since custom agent IDs are registered at runtime, custom NavMeshLinks must be created for them at runtime. This allows moon makers and other modders to have the links auto created on object awake.
+- Added AutoNavSurfaceCreator, same as AutoNavLinkCreator, but for NavMeshSurfaces
+- Added NavMeshLinkHelper, A helper mono behavior made to allow moon makers to use NavMeshLink's with transform's representing the start and end position like OffMeshLinks.
+- Made some minor bug fixes to CustomNavMeshAgentHelper
+- Added some logs to CustomNavMeshModifier and made a minor optimization
+- Added a HACKY fix for PathfindingLib causing the game to hardcrash with NavMeshLinks that are set to automatically update......dev was informed, but no response was received at the time.
+- Fixed Custom NavMesh Agents failing to path on any moon and interior since OffMeshLinks only work for the default agent ID......NavMeshLib will automatically create NavMeshLinks using prexisting OffMeshLinks found on levels.....this only happens after a moon is loaded and a dungeon is generated.
+- Added an extention method that creates a NavMeshQueryFilter from an NavMeshAgent.
+- Changed UpdateNavMeshDelayed to start UpdateNavMesh on all given NavMeshSurfaces rather than doing them one by one......this sped up NavMesh generation with no noticable impact on performance.
+- Fixed some logic errors in IsValidPathToTarget
+- For C# programmers, added CopyOffMeshLinks, CopyOffMeshLink, and AddMissingNavMeshSurfaces. XML documentation has been provided for these new methods.
+
 ## 3.1.0 - 2026-10-5
 - Fixed CustomNavMeshModifier not rebaking the Navmesh if it was disabled or re-enabled.
 - Fixed a bug with CustomNavMeshModifier.CreateFromColliders sometimes not creating and adding NavMeshUpdater to the newly created CustomNavMeshModifier.

@@ -58,7 +58,7 @@ namespace NavMeshLib
             }
 
             // This may be a partial path, make sure the end of the path actually reaches our target destiniation!
-            if ((storedPathCorners[storedPathCorners.Length - 1] - RoundManager.Instance.GetNavMeshPosition(endPosition, RoundManager.Instance.navHit, nearestNavAreaRange)).sqrMagnitude > maxRangeToEnd * maxRangeToEnd)
+            if ((storedPathCorners[storedPathCorners.Length - 1] - RoundManager.Instance.GetNavMeshPosition(endPosition, RoundManager.Instance.navHit, nearestNavAreaRange, areaMask)).sqrMagnitude > maxRangeToEnd * maxRangeToEnd)
             {
                 return false;
             }
@@ -112,7 +112,7 @@ namespace NavMeshLib
             }
 
             // This may be a partial path, make sure the end of the path actually reaches our target destiniation!
-            if ((storedPathCorners[storedPathCorners.Length - 1] - RoundManager.Instance.GetNavMeshPosition(endPosition, RoundManager.Instance.navHit, nearestNavAreaRange)).sqrMagnitude > maxRangeToEnd * maxRangeToEnd)
+            if ((storedPathCorners[storedPathCorners.Length - 1] - RoundManager.Instance.GetNavMeshPosition(endPosition, queryFilter, RoundManager.Instance.navHit, nearestNavAreaRange)).sqrMagnitude > maxRangeToEnd * maxRangeToEnd)
             {
                 return false;
             }
@@ -802,7 +802,7 @@ namespace NavMeshLib
             if (linkToCopy.startTransform == null
                 || linkToCopy.endTransform == null)
             {
-                Plugin.LogError($"[NavMeshUtil.CopyOffMeshLink] was given an OffMeshLink: {linkToCopy}");
+                Plugin.LogError($"[NavMeshUtil.CopyOffMeshLink] was given an invalid OffMeshLink: {linkToCopy}");
                 return false;
             }
 

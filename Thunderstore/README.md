@@ -34,6 +34,17 @@ Interior - The modifier is parented to the Dungen object. <br/>
 MoonEnvironment - The modifier is parented to the OutsideLevelNavMesh object. <br/>
 Custom - The modifier is parented to the object you specify. <br/>
 
+## AutoNavLinkCreator
+A helper mono behavior made to allow moon makers to automatically have NavMeshLinks created for custom agent types at runtime. <br/>
+Since custom agent IDs are registered at runtime, custom NavMeshLinks must be created for them at runtime. <br/>
+This allows moon makers and other modders to have the links auto created on object awake. <br/>
+
+## AutoNavSurfaceCreator 
+Same as AutoNavLinkCreator, but for NavMeshSurfaces
+
+## NavMeshLinkHelper
+A helper mono behavior made to allow moon makers to use NavMeshLink's with transform's representing the start and end position like OffMeshLinks.
+
 # NavMesh Generation Improvements
 NavMesh Lib also improves NavMesh generation by using **UpdateNavMesh** instead of **BuildNavMesh**. <br/>
 Unity NavMesh generation is already multi-threaded but **BuildNavMesh** waits until the NavMesh is ready which block the main thread. <br/>
