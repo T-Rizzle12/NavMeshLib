@@ -1,6 +1,6 @@
 # Changelog
 
-## 3.2.0 - 2026-10-29
+## 3.2.0 - 2026-10-30
 Just adding some more stuff to help out with Custom NavMeshAgent IDs. 
 Anyhow, here is the stuff that was added or changed.
 
