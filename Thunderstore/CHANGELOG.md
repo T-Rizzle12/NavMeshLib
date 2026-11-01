@@ -1,5 +1,8 @@
 # Changelog
 
+## 3.2.1 - 2026-11-1
+- Fixed base game enemies breaking when Pathfinding Lib and Enemy Pathfinding Lag Fix is installed
+
 ## 3.2.0 - 2026-10-30
 Just adding some more stuff to help out with Custom NavMeshAgent IDs. 
 Anyhow, here is the stuff that was added or changed.

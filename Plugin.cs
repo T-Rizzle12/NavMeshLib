@@ -17,14 +17,17 @@ namespace NavMeshLib
     {
         public const string PLUGIN_GUID = "T-Rizzle.NavMeshLib";
         public const string PLUGIN_NAME = "NavMeshLib";
-        public const string PLUGIN_VERSION = "3.2.0";
+        public const string PLUGIN_VERSION = "3.2.1";
     }
 
     [BepInPlugin(MyPluginInfo.PLUGIN_GUID, MyPluginInfo.PLUGIN_NAME, MyPluginInfo.PLUGIN_VERSION)]
+    [BepInDependency(PathfindingLib.PathfindingLibPlugin.PluginGUID, BepInDependency.DependencyFlags.SoftDependency)]
     public class Plugin : BaseUnityPlugin
     {
         internal static new ManualLogSource Logger = null!;
         private readonly Harmony _harmony = new(MyPluginInfo.PLUGIN_GUID);
+
+        internal static bool IsModPathfindingLibLoaded = false;
 
         private static readonly HashSet<string> ignoredScenes = new HashSet<string>() 
         {
@@ -49,12 +52,30 @@ namespace NavMeshLib
             PatchClass<UnityNavMeshAdapterPatch>();
             PatchClass<NavMeshLinkPatch>();
 
+            // Check for soft depedencies
+            IsModPathfindingLibLoaded = IsModLoaded(PathfindingLib.PathfindingLibPlugin.PluginGUID);
+            if (IsModPathfindingLibLoaded)
+            {
+                PatchClass<PathfindingLibPatch>();
+            }
+
             // Add our OnSceneLoaded hooks
             SceneManager.sceneLoaded += OnSceneLoaded_CopyOffMeshLinks;
             SceneManager.sceneLoaded += OnSceneLoaded_CompanyCruiser;
             SceneManager.sceneLoaded += OnSceneLoaded_MineshaftElevator;
 
             Plugin.LogInfo($"Plugin {MyPluginInfo.PLUGIN_GUID} is loaded!");
+        }
+
+        private static bool IsModLoaded(string modGUID)
+        {
+            bool ret = Chainloader.PluginInfos.ContainsKey(modGUID);
+            if (ret)
+            {
+                LogInfo($"Mod compatibility loaded for mod : GUID {modGUID}");
+            }
+
+            return ret;
         }
 
         private void OnSceneLoaded_CopyOffMeshLinks(Scene scene, LoadSceneMode mode)

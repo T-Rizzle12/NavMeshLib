@@ -1,4 +1,5 @@
 ﻿using NavMeshLib.Editor;
+using NavMeshLib.Patches;
 using System;
 using System.Collections;
 using System.Collections.Generic;
@@ -582,6 +583,12 @@ namespace NavMeshLib
             // Wait a frame to make sure everything else has loaded
             yield return null;
 
+            // Pathfinding Lib Support
+            if (Plugin.IsModPathfindingLibLoaded)
+            {
+                PathfindingLibPatch.BeginNavMeshWrite();
+            }
+
             // Cache information about the interior culling system!
             int completedOperations = 0;
             List<(AsyncOperation operation, NavMeshSurface surface)> asyncOperations = new List<(AsyncOperation, NavMeshSurface)>(surfacesToUpdate.Length);
@@ -630,6 +637,13 @@ namespace NavMeshLib
                         finally
                         {
                             completedOperations++;
+
+                            //// HACKHACK: Pathfinding Lib has a logic error that causes the write it automatically starts
+                            //// to never mark itself as completed.....for now...we will handle that case for them
+                            //if (Plugin.IsModPathfindingLibLoaded)
+                            //{
+                            //    PathfindingLibPatch.EndNavMeshWrite();
+                            //}
                         }
                     };
 
@@ -667,12 +681,24 @@ namespace NavMeshLib
             // Let the user know the build has finished
             onBuildCompleted?.Invoke();
             Plugin.LogInfo($"Updated {surfacesToUpdate.Length} NavMeshes.");
+
+            // Pathfinding Lib Support
+            if (Plugin.IsModPathfindingLibLoaded)
+            {
+                PathfindingLibPatch.EndNavMeshWrite();
+            }
         }
 
         private static IEnumerator UpdateNavMeshDelayed(NavMeshSurface surfaceToUpdate, Action? onBuildCompleted = null, Action<NavMeshSurface>? onSurfaceBuilt = null)
         {
             // Wait a frame to make sure everything else has loaded
             yield return null;
+
+            // Pathfinding Lib Support
+            if (Plugin.IsModPathfindingLibLoaded)
+            {
+                PathfindingLibPatch.BeginNavMeshWrite();
+            }
 
             // Cache information about the interior culling system!
             AdjacentRoomCullingModified roomCullingModified = StartOfRound.Instance.occlusionCuller;
@@ -723,6 +749,12 @@ namespace NavMeshLib
             // Let the user know the build has finished
             onBuildCompleted?.Invoke();
             Plugin.LogInfo($"Finished updating {surfaceToUpdate}.");
+
+            // Pathfinding Lib Support
+            if (Plugin.IsModPathfindingLibLoaded)
+            {
+                PathfindingLibPatch.EndNavMeshWrite();
+            }
         }
 
         #endregion
@@ -952,7 +984,28 @@ namespace NavMeshLib
                     {
                         Plugin.LogWarning($"[AddMissingNavMeshSurfaces] ({navMeshSurface.name}) was disabled, but Build Async was set. This is not allowed by Unity. Forcing Synchronous generation.");
                     }
+
+                    // Pathfinding Lib Support
+                    if (Plugin.IsModPathfindingLibLoaded)
+                    {
+                        PathfindingLibPatch.BeginNavMeshWrite();
+                    }
+
                     navMeshSurface.BuildNavMesh();
+
+                    // HACKHACK: Pathfinding Lib's Transpiler has a logic error that causes the write it automatically starts
+                    // to never mark itself as completed.....for now...we will handle that case for them
+                    // Yes, I know that I'm calling EndWrite twice
+                    if (Plugin.IsModPathfindingLibLoaded && !navMeshSurface.isActiveAndEnabled)
+                    {
+                        PathfindingLibPatch.EndNavMeshWrite();
+                    }
+
+                    // Pathfinding Lib Support
+                    if (Plugin.IsModPathfindingLibLoaded)
+                    {
+                        PathfindingLibPatch.EndNavMeshWrite();
+                    }
                 }
             }
         }
