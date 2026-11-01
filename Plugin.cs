@@ -17,7 +17,7 @@ namespace NavMeshLib
     {
         public const string PLUGIN_GUID = "T-Rizzle.NavMeshLib";
         public const string PLUGIN_NAME = "NavMeshLib";
-        public const string PLUGIN_VERSION = "3.2.1";
+        public const string PLUGIN_VERSION = "3.2.2";
     }
 
     [BepInPlugin(MyPluginInfo.PLUGIN_GUID, MyPluginInfo.PLUGIN_NAME, MyPluginInfo.PLUGIN_VERSION)]
