@@ -1,6 +1,6 @@
 # Changelog
 
-# 3.2.2. - 2026-11-1
+## 3.2.2 - 2026-11-1
 - Removed some debug logs that were left in the code by accident.....they would TANK performance
 
 ## 3.2.1 - 2026-11-1
