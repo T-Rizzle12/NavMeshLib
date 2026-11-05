@@ -6,7 +6,7 @@
 		<AssemblyName>NavMeshLib</AssemblyName>
 		<Product>NavMeshLib</Product>
 		<!-- Change to whatever version you're currently on. This will be used by tcli when building our Thunderstore package. -->
-		<Version>3.2.2</Version>
+		<Version>3.2.3</Version>
 	</PropertyGroup>
 
 	<!-- Project Properties -->

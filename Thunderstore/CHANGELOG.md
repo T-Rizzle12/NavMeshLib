@@ -1,5 +1,8 @@
 # Changelog
 
+## 3.2.3 - 2026-11-4
+- The PathfindingLib dev has fixed the bug regarding disabled BuildNavMesh calls causing a thread deadlock. So, the hack regarding the bug has been removed.
+
 ## 3.2.2 - 2026-11-1
 - Removed some debug logs that were left in the code by accident.....they would TANK performance
 

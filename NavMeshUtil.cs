@@ -991,15 +991,8 @@ namespace NavMeshLib
                         PathfindingLibPatch.BeginNavMeshWrite();
                     }
 
+                    // Bake our new mesh in one frame!
                     navMeshSurface.BuildNavMesh();
-
-                    // HACKHACK: Pathfinding Lib's Transpiler has a logic error that causes the write it automatically starts
-                    // to never mark itself as completed.....for now...we will handle that case for them
-                    // Yes, I know that I'm calling EndWrite twice
-                    if (Plugin.IsModPathfindingLibLoaded && !navMeshSurface.isActiveAndEnabled)
-                    {
-                        PathfindingLibPatch.EndNavMeshWrite();
-                    }
 
                     // Pathfinding Lib Support
                     if (Plugin.IsModPathfindingLibLoaded)
